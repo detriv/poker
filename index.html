@@ -1,0 +1,2618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OPNET Poker — On-Chain Texas Hold'em</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=JetBrains+Mono:wght@400;600&family=Cinzel:wght@700;900&display=swap');
+
+  :root {
+    --gold: #D4AF37;
+    --gold-light: #F5E27A;
+    --green-felt: #1a3a2a;
+    --green-deep: #0d1f16;
+    --green-mid: #1f4a30;
+    --red-card: #c0392b;
+    --black-card: #1a1a1a;
+    --chip-blue: #2980b9;
+    --chip-red: #c0392b;
+    --chip-green: #27ae60;
+    --chip-black: #2c3e50;
+    --bg: #0a0f0a;
+    --surface: #111811;
+    --border: rgba(212,175,55,0.25);
+    --text: #e8dcc8;
+    --text-dim: #8a7d6a;
+    --success: #2ecc71;
+    --danger: #e74c3c;
+    --info: #3498db;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── FELT TEXTURE ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 30%, rgba(26,90,50,0.15) 0%, transparent 70%),
+      url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 3h1v1H1V3zm2-2h1v1H3V1z' fill='%23ffffff' fill-opacity='0.015'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 32px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(10,15,10,0.95);
+    backdrop-filter: blur(10px);
+  }
+
+  .logo {
+    font-family: 'Cinzel', serif;
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    background: linear-gradient(135deg, var(--gold), var(--gold-light), var(--gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: none;
+  }
+
+  .logo span {
+    font-size: 11px;
+    display: block;
+    letter-spacing: 8px;
+    opacity: 0.7;
+    background: linear-gradient(135deg, var(--gold), var(--gold-light));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .header-right { display: flex; align-items: center; gap: 16px; }
+
+  .network-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  .network-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.3); }
+  }
+
+  /* ── WALLET BTN ── */
+  .wallet-btn {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 20px;
+    background: linear-gradient(135deg, #1a3a2a, #0f2018);
+    border: 1px solid var(--gold);
+    border-radius: 8px;
+    color: var(--gold);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .wallet-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent, rgba(212,175,55,0.08), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.4s;
+  }
+
+  .wallet-btn:hover::before { transform: translateX(100%); }
+  .wallet-btn:hover { border-color: var(--gold-light); box-shadow: 0 0 20px rgba(212,175,55,0.2); }
+
+  .wallet-icon { font-size: 16px; }
+
+  /* ── MAIN ── */
+  main {
+    position: relative;
+    z-index: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 32px 24px;
+  }
+
+  /* ── CONNECT OVERLAY ── */
+  #connect-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 70vh;
+    gap: 40px;
+    text-align: center;
+  }
+
+  .connect-card {
+    background: rgba(17,24,17,0.9);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 60px 80px;
+    max-width: 560px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .connect-card::before {
+    content: '';
+    position: absolute;
+    top: -1px; left: 15%; right: 15%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+
+  .connect-title {
+    font-family: 'Cinzel', serif;
+    font-size: 32px;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--gold), var(--gold-light));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+  }
+
+  .connect-subtitle {
+    color: var(--text-dim);
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 40px;
+  }
+
+  .card-suits {
+    font-size: 48px;
+    letter-spacing: 16px;
+    margin-bottom: 40px;
+    filter: drop-shadow(0 4px 12px rgba(212,175,55,0.3));
+    animation: float-suits 4s ease-in-out infinite;
+  }
+
+  @keyframes float-suits {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .wallet-options {
+    display: grid;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .wallet-option {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 20px;
+    background: rgba(26,58,42,0.3);
+    border: 1px solid rgba(212,175,55,0.15);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.25s;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--text);
+    width: 100%;
+    text-align: left;
+  }
+
+  .wallet-option:hover {
+    background: rgba(26,58,42,0.6);
+    border-color: var(--gold);
+    box-shadow: 0 0 20px rgba(212,175,55,0.1);
+    transform: translateX(4px);
+  }
+
+  .wallet-logo { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .wallet-logo.orange { background: linear-gradient(135deg, #f7931a, #f97316); }
+  .wallet-logo.purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+  .wallet-logo.blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+  .wallet-info { flex: 1; }
+  .wallet-name { font-weight: 600; font-size: 13px; }
+  .wallet-desc { font-size: 10px; color: var(--text-dim); margin-top: 2px; letter-spacing: 0.5px; }
+  .wallet-arrow { color: var(--text-dim); font-size: 16px; }
+
+  /* ── LOBBY ── */
+  #lobby-screen { display: none; }
+
+  .screen-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+  }
+
+  .screen-title {
+    font-family: 'Cinzel', serif;
+    font-size: 20px;
+    color: var(--gold);
+    letter-spacing: 3px;
+  }
+
+  .player-info-bar {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 12px 24px;
+    background: rgba(17,24,17,0.8);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+
+  .player-address {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  .player-balance {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gold);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btc-icon { font-size: 16px; }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 28px;
+    background: rgba(17,24,17,0.6);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+    width: fit-content;
+  }
+
+  .tab {
+    padding: 8px 24px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    background: transparent;
+  }
+
+  .tab.active {
+    background: rgba(212,175,55,0.15);
+    color: var(--gold);
+    border: 1px solid rgba(212,175,55,0.3);
+  }
+
+  /* ── TABLE GRID ── */
+  .tables-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+    margin-bottom: 32px;
+  }
+
+  .table-card {
+    background: rgba(17,24,17,0.85);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .table-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at top, rgba(212,175,55,0.05) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+
+  .table-card:hover { border-color: rgba(212,175,55,0.5); transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
+  .table-card:hover::after { opacity: 1; }
+
+  .table-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+  }
+
+  .table-name {
+    font-family: 'Cinzel', serif;
+    font-size: 15px;
+    color: var(--gold);
+    letter-spacing: 2px;
+  }
+
+  .table-status {
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .status-waiting { background: rgba(46,204,113,0.15); color: var(--success); border: 1px solid rgba(46,204,113,0.3); }
+  .status-playing { background: rgba(231,76,60,0.15); color: var(--danger); border: 1px solid rgba(231,76,60,0.3); }
+  .status-full { background: rgba(127,140,141,0.15); color: #7f8c8d; border: 1px solid rgba(127,140,141,0.3); }
+
+  .table-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .stat-item { text-align: center; }
+  .stat-value { font-size: 16px; font-weight: 600; color: var(--text); }
+  .stat-label { font-size: 9px; color: var(--text-dim); letter-spacing: 1.5px; text-transform: uppercase; margin-top: 2px; }
+
+  .table-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--text-dim);
+    padding-top: 14px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .seats-bar {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+  }
+
+  .seat-dot {
+    height: 6px;
+    flex: 1;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.1);
+    transition: background 0.3s;
+  }
+
+  .seat-dot.occupied { background: var(--gold); }
+  .seat-dot.you { background: var(--success); }
+
+  /* ── CREATE TABLE FORM ── */
+  .create-table-panel {
+    background: rgba(17,24,17,0.85);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 520px;
+    position: relative;
+  }
+
+  .create-table-panel::before {
+    content: '';
+    position: absolute;
+    top: -1px; left: 20%; right: 20%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+
+  .form-title {
+    font-family: 'Cinzel', serif;
+    font-size: 18px;
+    color: var(--gold);
+    letter-spacing: 3px;
+    margin-bottom: 28px;
+  }
+
+  .form-group { margin-bottom: 20px; }
+
+  .form-label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 12px 16px;
+    background: rgba(26,58,42,0.3);
+    border: 1px solid rgba(212,175,55,0.15);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    transition: all 0.2s;
+    outline: none;
+  }
+
+  .form-input:focus { border-color: var(--gold); background: rgba(26,58,42,0.5); box-shadow: 0 0 15px rgba(212,175,55,0.08); }
+
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .range-group { display: flex; align-items: center; gap: 12px; }
+  .range-input { flex: 1; accent-color: var(--gold); }
+  .range-value { font-size: 13px; color: var(--gold); min-width: 36px; }
+
+  .btn-primary {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #1a3a2a, #0f4520);
+    border: 1px solid var(--gold);
+    border-radius: 10px;
+    color: var(--gold);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary:hover { box-shadow: 0 0 30px rgba(212,175,55,0.2); border-color: var(--gold-light); }
+  .btn-primary:active { transform: scale(0.99); }
+
+  .btn-primary.loading { opacity: 0.7; pointer-events: none; }
+  .btn-primary.loading::after {
+    content: '●●●';
+    letter-spacing: 4px;
+    animation: btn-dots 1.2s infinite;
+    position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+    font-size: 8px;
+  }
+
+  @keyframes btn-dots {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* ── GAME SCREEN ── */
+  #game-screen { display: none; }
+
+  .game-layout {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 20px;
+    min-height: calc(100vh - 120px);
+  }
+
+  /* ── POKER TABLE ── */
+  .poker-table-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .poker-table {
+    position: relative;
+    width: 100%;
+    max-width: 900px;
+    height: 420px;
+  }
+
+  /* Felt oval */
+  .table-felt {
+    position: absolute;
+    inset: 0;
+    border-radius: 50% / 50%;
+    background: radial-gradient(ellipse at 30% 30%, #1f5c35 0%, var(--green-felt) 40%, #0d2a1a 100%);
+    box-shadow:
+      inset 0 0 60px rgba(0,0,0,0.5),
+      inset 0 0 20px rgba(0,100,50,0.1),
+      0 20px 60px rgba(0,0,0,0.8);
+  }
+
+  .table-rail {
+    position: absolute;
+    inset: -16px;
+    border-radius: 50% / 50%;
+    background: linear-gradient(135deg, #2c1a0a, #1a0f05, #2c1a0a);
+    z-index: -1;
+    box-shadow:
+      0 0 0 3px #3d2510,
+      0 0 0 5px #1a0f05,
+      0 30px 80px rgba(0,0,0,0.9);
+  }
+
+  /* Table logo */
+  .table-logo {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    opacity: 0.15;
+    pointer-events: none;
+  }
+
+  .table-logo-text {
+    font-family: 'Cinzel', serif;
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--gold);
+    letter-spacing: 6px;
+    display: block;
+  }
+
+  .table-logo-sub {
+    font-size: 8px;
+    letter-spacing: 10px;
+    color: var(--gold);
+    display: block;
+    margin-top: 4px;
+  }
+
+  /* ── COMMUNITY CARDS ── */
+  .community-area {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .community-cards {
+    display: flex;
+    gap: 8px;
+  }
+
+  .card {
+    width: 54px;
+    height: 78px;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 18px;
+    position: relative;
+    transition: transform 0.3s;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+  }
+
+  .card.face-down {
+    background: linear-gradient(135deg, #1a3a8a, #0d1f60);
+    background-image: repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 4px,
+      rgba(255,255,255,0.03) 4px,
+      rgba(255,255,255,0.03) 5px
+    );
+    border: 2px solid rgba(255,255,255,0.15);
+  }
+
+  .card.face-down::before {
+    content: '🂠';
+    font-size: 36px;
+    opacity: 0.3;
+  }
+
+  .card.face-up {
+    background: #fefefe;
+    border: 2px solid rgba(0,0,0,0.1);
+  }
+
+  .card.face-up .card-rank { font-size: 14px; line-height: 1; position: absolute; top: 4px; left: 6px; }
+  .card.face-up .card-suit { font-size: 22px; }
+  .card.face-up .card-rank-bottom { font-size: 14px; line-height: 1; position: absolute; bottom: 4px; right: 6px; transform: rotate(180deg); }
+  .card.red { color: #c0392b; }
+  .card.black { color: #1a1a2e; }
+
+  .card-placeholder {
+    width: 54px; height: 78px;
+    border-radius: 6px;
+    border: 2px dashed rgba(212,175,55,0.2);
+    background: rgba(212,175,55,0.02);
+  }
+
+  .card.deal-in {
+    animation: deal-card 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  }
+
+  @keyframes deal-card {
+    from { transform: translateY(-40px) scale(0.8) rotateY(90deg); opacity: 0; }
+    to { transform: translateY(0) scale(1) rotateY(0deg); opacity: 1; }
+  }
+
+  /* ── POT ── */
+  .pot-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(212,175,55,0.3);
+    border-radius: 20px;
+    padding: 6px 20px;
+  }
+
+  .pot-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); }
+  .pot-amount { font-size: 15px; font-weight: 600; color: var(--gold); }
+
+  /* ── PLAYER SEATS ── */
+  .player-seat {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.3s;
+  }
+
+  /* Seat positions around oval */
+  .seat-0 { top: -24px; left: 50%; transform: translateX(-50%); }
+  .seat-1 { top: 5%; right: 5%; }
+  .seat-2 { bottom: 5%; right: 5%; }
+  .seat-3 { bottom: -24px; left: 50%; transform: translateX(-50%); }
+  .seat-4 { bottom: 5%; left: 5%; }
+  .seat-5 { top: 5%; left: 5%; }
+
+  .seat-avatar {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1a3a2a, #0d2018);
+    border: 2px solid rgba(212,175,55,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .seat-avatar.active-turn {
+    border-color: var(--gold);
+    box-shadow: 0 0 20px rgba(212,175,55,0.5);
+    animation: seat-pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes seat-pulse {
+    0%,100% { box-shadow: 0 0 20px rgba(212,175,55,0.5); }
+    50% { box-shadow: 0 0 35px rgba(212,175,55,0.8); }
+  }
+
+  .seat-avatar.folded { opacity: 0.4; filter: grayscale(1); }
+  .seat-avatar.you { border-color: var(--info); }
+
+  .seat-name { font-size: 9px; letter-spacing: 1px; color: var(--text-dim); max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+  .seat-stack { font-size: 11px; font-weight: 600; color: var(--text); }
+  .seat-bet { font-size: 10px; color: var(--gold); min-height: 14px; }
+
+  .seat-cards {
+    display: flex;
+    gap: 3px;
+  }
+
+  .seat-card {
+    width: 22px; height: 32px;
+    border-radius: 3px;
+    background: linear-gradient(135deg, #1a3a8a, #0d1f60);
+    border: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .seat-card.face-up {
+    background: #fefefe;
+    color: #c0392b;
+    border: 1px solid rgba(0,0,0,0.15);
+    font-size: 8px;
+  }
+
+  .dealer-chip {
+    position: absolute;
+    top: -4px; right: -4px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--gold), #8b6914);
+    font-size: 8px;
+    font-weight: 900;
+    color: #1a1a1a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    letter-spacing: 0;
+  }
+
+  /* ── TIMER ── */
+  .action-timer {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    border-top-color: var(--gold);
+    animation: none;
+  }
+
+  .action-timer.running {
+    animation: count-down 30s linear forwards;
+  }
+
+  @keyframes count-down {
+    from { transform: rotate(0deg); border-top-color: var(--success); }
+    60% { border-top-color: var(--gold); }
+    85% { border-top-color: var(--danger); }
+    to { transform: rotate(360deg); border-top-color: var(--danger); }
+  }
+
+  /* ── ACTION PANEL ── */
+  .action-panel {
+    background: rgba(17,24,17,0.92);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .player-hole-cards {
+    display: flex;
+    gap: 8px;
+    margin-right: 8px;
+  }
+
+  .hole-card {
+    width: 52px; height: 74px;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #fefefe;
+    border: 2px solid rgba(0,0,0,0.1);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    transition: transform 0.2s;
+    font-weight: 700;
+  }
+
+  .hole-card:hover { transform: translateY(-6px); }
+  .hole-card .rank { font-size: 13px; position: absolute; top: 3px; left: 5px; }
+  .hole-card .suit-big { font-size: 20px; }
+  .hole-card .rank-bottom { font-size: 13px; position: absolute; bottom: 3px; right: 5px; transform: rotate(180deg); }
+  .hole-card.red-card { color: #c0392b; }
+  .hole-card.black-card { color: #1a1a2e; }
+  .hole-card { position: relative; }
+
+  .actions { display: flex; gap: 10px; flex: 1; flex-wrap: wrap; align-items: center; }
+
+  .action-btn {
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid;
+  }
+
+  .btn-fold { background: rgba(192,57,43,0.15); border-color: rgba(192,57,43,0.4); color: #e74c3c; }
+  .btn-fold:hover { background: rgba(192,57,43,0.3); box-shadow: 0 0 16px rgba(231,76,60,0.2); }
+
+  .btn-check { background: rgba(52,152,219,0.15); border-color: rgba(52,152,219,0.4); color: #3498db; }
+  .btn-check:hover { background: rgba(52,152,219,0.3); }
+
+  .btn-call { background: rgba(39,174,96,0.15); border-color: rgba(39,174,96,0.4); color: var(--success); }
+  .btn-call:hover { background: rgba(39,174,96,0.3); }
+
+  .btn-raise { background: rgba(212,175,55,0.15); border-color: rgba(212,175,55,0.4); color: var(--gold); }
+  .btn-raise:hover { background: rgba(212,175,55,0.3); }
+
+  .btn-allin { background: rgba(192,57,43,0.2); border-color: #c0392b; color: #ff6b6b; }
+  .btn-allin:hover { background: rgba(192,57,43,0.4); box-shadow: 0 0 20px rgba(192,57,43,0.3); }
+
+  .raise-input-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(26,58,42,0.3);
+    border: 1px solid rgba(212,175,55,0.2);
+    border-radius: 8px;
+    padding: 6px 12px;
+  }
+
+  .raise-input {
+    background: none;
+    border: none;
+    color: var(--gold);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    width: 90px;
+    outline: none;
+  }
+
+  .timer-display {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .timer-ring {
+    width: 36px; height: 36px;
+    position: relative;
+  }
+
+  .timer-ring svg { transform: rotate(-90deg); }
+  .timer-ring circle {
+    fill: none;
+    stroke: rgba(255,255,255,0.1);
+    stroke-width: 3;
+  }
+
+  .timer-ring .progress {
+    stroke: var(--gold);
+    stroke-dasharray: 88;
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 1s linear, stroke 0.3s;
+  }
+
+  .timer-ring .progress.urgent { stroke: var(--danger); }
+  .timer-number { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; font-weight: 600; color: var(--text); }
+
+  /* ── SIDE PANEL ── */
+  .game-side {
+    width: 280px;
+    flex-shrink: 0;
+  }
+
+  .game-wrapper {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+  }
+
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .side-card {
+    background: rgba(17,24,17,0.85);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+  }
+
+  .side-card-title {
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .side-card-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── TX LOG ── */
+  .tx-log {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .tx-log::-webkit-scrollbar { width: 3px; }
+  .tx-log::-webkit-scrollbar-track { background: transparent; }
+  .tx-log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .tx-entry {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    background: rgba(26,58,42,0.2);
+    border-radius: 6px;
+    border-left: 2px solid;
+    animation: slide-in 0.3s ease;
+  }
+
+  @keyframes slide-in {
+    from { transform: translateX(20px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  .tx-entry.bet { border-color: var(--gold); }
+  .tx-entry.fold { border-color: #7f8c8d; }
+  .tx-entry.win { border-color: var(--success); }
+  .tx-entry.join { border-color: var(--info); }
+  .tx-entry.create { border-color: #9b59b6; }
+
+  .tx-action { font-size: 10px; color: var(--text); font-weight: 600; }
+  .tx-detail { font-size: 9px; color: var(--text-dim); letter-spacing: 0.5px; }
+  .tx-hash { font-size: 8px; color: var(--info); cursor: pointer; }
+  .tx-hash:hover { text-decoration: underline; }
+
+  /* ── HAND STRENGTH ── */
+  .hand-meter {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .hand-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 17px;
+    color: var(--gold);
+    text-align: center;
+  }
+
+  .hand-rank-bar {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+  }
+
+  .rank-segment {
+    height: 5px;
+    flex: 1;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.1);
+    transition: background 0.4s;
+  }
+
+  .rank-segment.active { background: var(--gold); }
+  .rank-segment.super { background: linear-gradient(90deg, var(--gold), #ff6b35); }
+
+  /* ── CHIP VISUALIZATION ── */
+  .chips-display {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  .chip {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: 0;
+    border: 3px dashed;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.5);
+    color: white;
+  }
+
+  .chip.c25 { background: #27ae60; border-color: #1e8449; }
+  .chip.c100 { background: #2980b9; border-color: #1f618d; }
+  .chip.c500 { background: #c0392b; border-color: #922b21; }
+  .chip.c1000 { background: #2c3e50; border-color: #1a252f; }
+  .chip.c5000 { background: linear-gradient(135deg, #d4af37, #8b6914); border-color: #6d5011; color: #1a1a1a; }
+
+  /* ── NOTIFICATIONS ── */
+  .notification-stack {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 1000;
+  }
+
+  .notification {
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 12px;
+    max-width: 320px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: notif-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    backdrop-filter: blur(10px);
+  }
+
+  @keyframes notif-in {
+    from { transform: translateX(40px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  .notif-success { background: rgba(39,174,96,0.2); border: 1px solid rgba(39,174,96,0.4); }
+  .notif-error { background: rgba(192,57,43,0.2); border: 1px solid rgba(192,57,43,0.4); }
+  .notif-info { background: rgba(52,152,219,0.2); border: 1px solid rgba(52,152,219,0.4); }
+  .notif-gold { background: rgba(212,175,55,0.15); border: 1px solid rgba(212,175,55,0.4); }
+
+  /* ── WINNER OVERLAY ── */
+  .winner-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 900;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(6px);
+  }
+
+  .winner-overlay.show { display: flex; }
+
+  .winner-card {
+    text-align: center;
+    padding: 60px 80px;
+    background: rgba(17,24,17,0.97);
+    border: 1px solid var(--gold);
+    border-radius: 24px;
+    position: relative;
+    overflow: hidden;
+    animation: winner-in 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+
+  @keyframes winner-in {
+    from { transform: scale(0.7); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .winner-title {
+    font-family: 'Cinzel', serif;
+    font-size: 42px;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--gold), var(--gold-light), var(--gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: none;
+    margin-bottom: 8px;
+    animation: glow-title 2s ease-in-out infinite;
+  }
+
+  @keyframes glow-title {
+    0%,100% { filter: brightness(1); }
+    50% { filter: brightness(1.3); }
+  }
+
+  .winner-amount { font-size: 28px; color: var(--gold); font-weight: 600; margin: 16px 0; }
+  .winner-hand { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--text-dim); }
+  .winner-player { font-size: 14px; color: var(--text); margin-top: 8px; letter-spacing: 2px; }
+
+  .confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .confetti-piece {
+    position: absolute;
+    width: 8px; height: 8px;
+    animation: confetti-fall linear forwards;
+    border-radius: 2px;
+  }
+
+  @keyframes confetti-fall {
+    0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(400px) rotate(720deg); opacity: 0; }
+  }
+
+  /* ── ON-CHAIN TX MODAL ── */
+  .tx-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.9);
+    z-index: 950;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .tx-modal.show { display: flex; }
+
+  .tx-modal-card {
+    background: rgba(17,24,17,0.98);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 40px;
+    width: 440px;
+    position: relative;
+    text-align: center;
+  }
+
+  .tx-modal-title {
+    font-family: 'Cinzel', serif;
+    font-size: 18px;
+    color: var(--gold);
+    letter-spacing: 3px;
+    margin-bottom: 8px;
+  }
+
+  .tx-modal-desc { font-size: 11px; color: var(--text-dim); margin-bottom: 28px; letter-spacing: 1px; }
+
+  .tx-loading {
+    width: 60px; height: 60px;
+    border: 3px solid rgba(212,175,55,0.1);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .tx-steps { display: flex; flex-direction: column; gap: 10px; text-align: left; }
+
+  .tx-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: rgba(26,58,42,0.2);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .tx-step.done { color: var(--text); background: rgba(39,174,96,0.1); }
+  .tx-step.active { color: var(--gold); background: rgba(212,175,55,0.08); }
+
+  .step-icon { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; }
+  .step-icon.done { background: var(--success); }
+  .step-icon.active { background: rgba(212,175,55,0.3); animation: pulse-step 1s ease-in-out infinite; }
+  .step-icon.pending { background: rgba(255,255,255,0.1); }
+
+  @keyframes pulse-step { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .tx-hash-display {
+    margin-top: 20px;
+    padding: 10px 14px;
+    background: rgba(52,152,219,0.1);
+    border: 1px solid rgba(52,152,219,0.2);
+    border-radius: 8px;
+    font-size: 10px;
+    color: var(--info);
+    word-break: break-all;
+    text-align: left;
+    display: none;
+  }
+
+  /* ── MCP STATUS ── */
+  .mcp-status {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(17,24,17,0.95);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 10px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+  }
+
+  .mcp-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .mcp-dot.green { background: var(--success); animation: pulse-dot 2s ease-in-out infinite; }
+  .mcp-dot.yellow { background: #f39c12; animation: pulse-dot 1s ease-in-out infinite; }
+  .mcp-dot.red { background: var(--danger); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    .game-wrapper { flex-direction: column; }
+    .game-side { width: 100%; }
+    .poker-table { height: 300px; }
+    .connect-card { padding: 40px 28px; }
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* ── PHASE INDICATOR ── */
+  .phase-bar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 0 20px;
+    margin-bottom: 12px;
+  }
+
+  .phase-step {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex: 1;
+  }
+
+  .phase-dot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-dim);
+    flex-shrink: 0;
+    transition: all 0.3s;
+    letter-spacing: 0;
+  }
+
+  .phase-dot.done { background: rgba(39,174,96,0.2); border-color: var(--success); color: var(--success); }
+  .phase-dot.active { background: rgba(212,175,55,0.15); border-color: var(--gold); color: var(--gold); box-shadow: 0 0 12px rgba(212,175,55,0.3); }
+
+  .phase-line { flex: 1; height: 1px; background: rgba(255,255,255,0.07); }
+  .phase-line.done { background: rgba(39,174,96,0.3); }
+
+  .phase-label { font-size: 8px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); text-align: center; margin-top: 4px; }
+
+  /* ── BLOCKCHAIN EXPLORER LINK ── */
+  .explorer-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--info);
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .explorer-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header>
+  <div>
+    <div class="logo">OPNET POKER<span>BITCOIN BLOCKCHAIN</span></div>
+  </div>
+  <div class="header-right">
+    <div class="network-badge" id="network-badge">
+      <div class="network-dot"></div>
+      <span id="network-label">OPNET MAINNET</span>
+    </div>
+    <button class="wallet-btn" id="header-wallet-btn" onclick="showConnectScreen()">
+      <span class="wallet-icon">₿</span>
+      <span id="wallet-btn-label">CONNECT WALLET</span>
+    </button>
+  </div>
+</header>
+
+<!-- ── NOTIFICATION STACK ── -->
+<div class="notification-stack" id="notif-stack"></div>
+
+<!-- ── MCP STATUS ── -->
+<div class="mcp-status">
+  <div class="mcp-dot green" id="mcp-dot"></div>
+  <span id="mcp-label">OPNET MCP · ai.opnet.org</span>
+</div>
+
+<!-- ── MAIN ── -->
+<main>
+
+  <!-- CONNECT SCREEN -->
+  <div id="connect-screen">
+    <div class="connect-card">
+      <div class="card-suits">♠ ♥ ♦ ♣</div>
+      <div class="connect-title">OPNET POKER</div>
+      <div class="connect-subtitle">TEXAS HOLD'EM · ON-CHAIN · TRANSPARENT</div>
+      <div class="wallet-options">
+        <button class="wallet-option" onclick="connectWallet('opnet')">
+          <div class="wallet-logo orange">₿</div>
+          <div class="wallet-info">
+            <div class="wallet-name">OPNET Wallet</div>
+            <div class="wallet-desc">Native Bitcoin smart contract wallet</div>
+          </div>
+          <span class="wallet-arrow">→</span>
+        </button>
+        <button class="wallet-option" onclick="connectWallet('unisat')">
+          <div class="wallet-logo orange" style="background:linear-gradient(135deg,#f97316,#ef4444)">🦄</div>
+          <div class="wallet-info">
+            <div class="wallet-name">UniSat Wallet</div>
+            <div class="wallet-desc">Bitcoin & Ordinals wallet</div>
+          </div>
+          <span class="wallet-arrow">→</span>
+        </button>
+        <button class="wallet-option" onclick="connectWallet('xverse')">
+          <div class="wallet-logo purple">✗</div>
+          <div class="wallet-info">
+            <div class="wallet-name">Xverse Wallet</div>
+            <div class="wallet-desc">Bitcoin, Stacks & Ordinals</div>
+          </div>
+          <span class="wallet-arrow">→</span>
+        </button>
+        <button class="wallet-option" onclick="connectWallet('leather')">
+          <div class="wallet-logo blue">🔷</div>
+          <div class="wallet-info">
+            <div class="wallet-name">Leather Wallet</div>
+            <div class="wallet-desc">Bitcoin & Stacks ecosystem</div>
+          </div>
+          <span class="wallet-arrow">→</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOBBY SCREEN -->
+  <div id="lobby-screen">
+    <div class="screen-header">
+      <div class="screen-title">♠ POKER LOBBY</div>
+      <div class="player-info-bar">
+        <div>
+          <div class="player-address" id="display-address">bc1q...xxxx</div>
+          <div style="font-size:9px;color:var(--text-dim);letter-spacing:1px;margin-top:2px">BTC WALLET</div>
+        </div>
+        <div class="player-balance">
+          <span class="btc-icon">₿</span>
+          <span id="display-balance">0.00000</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('tables')">TABLES</button>
+      <button class="tab" onclick="switchTab('create')">CREATE</button>
+      <button class="tab" onclick="switchTab('history')">HISTORY</button>
+    </div>
+
+    <!-- TABLES TAB -->
+    <div id="tab-tables">
+      <div class="tables-grid" id="tables-grid">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- CREATE TABLE TAB -->
+    <div id="tab-create" style="display:none">
+      <div class="create-table-panel">
+        <div class="form-title">♦ CREATE NEW TABLE</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Table Name</label>
+            <input class="form-input" id="tbl-name" placeholder="High Rollers..." value="">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max Players</label>
+            <select class="form-input" id="tbl-maxplayers">
+              <option value="2">2 players</option>
+              <option value="4">4 players</option>
+              <option value="6" selected>6 players</option>
+              <option value="9">9 players</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Min Buy-In (sats)</label>
+            <input class="form-input" id="tbl-buyin" type="number" placeholder="10000" value="10000">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Small Blind (sats)</label>
+            <input class="form-input" id="tbl-blind" type="number" placeholder="50" value="50">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Rake Fee: <span id="rake-val">2%</span></label>
+          <div class="range-group">
+            <input class="range-input" type="range" id="tbl-rake" min="0" max="5" step="0.5" value="2"
+              oninput="document.getElementById('rake-val').textContent=this.value+'%'">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Action Timeout (sec)</label>
+          <div class="range-group">
+            <input class="range-input" type="range" id="tbl-timeout" min="15" max="120" step="15" value="30"
+              oninput="document.getElementById('timeout-val').textContent=this.value+'s'">
+            <span class="range-value" id="timeout-val">30s</span>
+          </div>
+        </div>
+        <button class="btn-primary" id="create-btn" onclick="createTable()">
+          DEPLOY SMART CONTRACT
+        </button>
+        <div style="margin-top:14px;font-size:9px;color:var(--text-dim);line-height:1.8;letter-spacing:0.5px">
+          🔗 Contract deployed on OPNET Bitcoin blockchain via MCP AI Agent<br>
+          🔒 Funds secured in escrow · Transparent · Verifiable on-chain<br>
+          🎲 Commit-reveal randomness scheme for provably fair cards
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div id="tab-history" style="display:none">
+      <div class="side-card" style="max-width:700px">
+        <div class="side-card-title">ON-CHAIN TRANSACTION HISTORY</div>
+        <div id="history-list" style="display:flex;flex-direction:column;gap:8px;">
+          <!-- Populated -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div id="game-screen">
+    <div class="screen-header">
+      <div style="display:flex;align-items:center;gap:16px">
+        <button onclick="backToLobby()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:6px 14px;color:var(--text-dim);font-family:inherit;font-size:10px;cursor:pointer;letter-spacing:1px;">← LOBBY</button>
+        <div class="screen-title" id="game-title">♠ HIGH ROLLERS TABLE</div>
+      </div>
+      <div class="player-info-bar">
+        <div style="font-size:11px;color:var(--text-dim)">MY STACK</div>
+        <div class="player-balance"><span>₿</span><span id="game-stack">0</span> sats</div>
+      </div>
+    </div>
+
+    <!-- Phase indicator -->
+    <div class="phase-bar" id="phase-bar">
+      <div class="phase-step">
+        <div class="phase-dot active" id="phase-preflop">PRE</div>
+        <div style="display:flex;flex-direction:column;align-items:center;flex:0;margin-top:16px">
+          <div class="phase-label" style="margin:0">PREFLOP</div>
+        </div>
+      </div>
+      <div class="phase-line" id="line-1"></div>
+      <div class="phase-step">
+        <div class="phase-dot" id="phase-flop">FLP</div>
+        <div style="display:flex;flex-direction:column;align-items:center;flex:0;margin-top:16px">
+          <div class="phase-label" style="margin:0">FLOP</div>
+        </div>
+      </div>
+      <div class="phase-line" id="line-2"></div>
+      <div class="phase-step">
+        <div class="phase-dot" id="phase-turn">TRN</div>
+        <div style="display:flex;flex-direction:column;align-items:center;flex:0;margin-top:16px">
+          <div class="phase-label" style="margin:0">TURN</div>
+        </div>
+      </div>
+      <div class="phase-line" id="line-3"></div>
+      <div class="phase-step">
+        <div class="phase-dot" id="phase-river">RVR</div>
+        <div style="display:flex;flex-direction:column;align-items:center;flex:0;margin-top:16px">
+          <div class="phase-label" style="margin:0">RIVER</div>
+        </div>
+      </div>
+      <div class="phase-line" id="line-4"></div>
+      <div class="phase-step">
+        <div class="phase-dot" id="phase-showdown">SHW</div>
+        <div style="display:flex;flex-direction:column;align-items:center;flex:0;margin-top:16px">
+          <div class="phase-label" style="margin:0">SHOWDOWN</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-wrapper">
+      <!-- MAIN GAME AREA -->
+      <div style="flex:1;display:flex;flex-direction:column;gap:16px">
+        <!-- TABLE -->
+        <div class="poker-table-container">
+          <div class="poker-table">
+            <div class="table-rail"></div>
+            <div class="table-felt">
+              <div class="table-logo">
+                <span class="table-logo-text">OPNET</span>
+                <span class="table-logo-sub">BLOCKCHAIN POKER</span>
+              </div>
+
+              <!-- Player Seats -->
+              <div class="player-seat seat-0" id="seat-0"></div>
+              <div class="player-seat seat-1" id="seat-1"></div>
+              <div class="player-seat seat-2" id="seat-2"></div>
+              <div class="player-seat seat-3" id="seat-3"></div>
+              <div class="player-seat seat-4" id="seat-4"></div>
+              <div class="player-seat seat-5" id="seat-5"></div>
+
+              <!-- Community cards + pot -->
+              <div class="community-area">
+                <div class="pot-display">
+                  <span class="pot-label">POT</span>
+                  <span class="pot-amount" id="pot-display">₿ 0 sats</span>
+                </div>
+                <div class="community-cards" id="community-cards">
+                  <div class="card-placeholder"></div>
+                  <div class="card-placeholder"></div>
+                  <div class="card-placeholder"></div>
+                  <div class="card-placeholder"></div>
+                  <div class="card-placeholder"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ACTION PANEL -->
+        <div class="action-panel" id="action-panel">
+          <div class="player-hole-cards" id="hole-cards">
+            <div class="hole-card black-card" style="opacity:0.3">
+              <span class="rank">?</span>
+              <span class="suit-big">♠</span>
+              <span class="rank-bottom">?</span>
+            </div>
+            <div class="hole-card black-card" style="opacity:0.3">
+              <span class="rank">?</span>
+              <span class="suit-big">♠</span>
+              <span class="rank-bottom">?</span>
+            </div>
+          </div>
+          <div class="actions" id="action-buttons">
+            <span style="font-size:11px;color:var(--text-dim);letter-spacing:1px">Waiting for game to start...</span>
+          </div>
+          <div class="timer-display">
+            <div class="timer-ring" id="timer-ring">
+              <svg width="36" height="36" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="14" stroke-width="3"/>
+                <circle cx="18" cy="18" r="14" class="progress" id="timer-progress" stroke-dasharray="88" stroke-dashoffset="0"/>
+              </svg>
+              <div class="timer-number" id="timer-num">30</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SIDE PANEL -->
+      <div class="game-side">
+        <div class="side-panel">
+          <!-- Hand Strength -->
+          <div class="side-card">
+            <div class="side-card-title">HAND STRENGTH</div>
+            <div class="hand-meter">
+              <div class="hand-name" id="hand-name">Waiting...</div>
+              <div class="hand-rank-bar" id="hand-bar">
+                <div class="rank-segment"></div>
+                <div class="rank-segment"></div>
+                <div class="rank-segment"></div>
+                <div class="rank-segment"></div>
+                <div class="rank-segment"></div>
+                <div class="rank-segment"></div>
+                <div class="rank-segment"></div>
+                <div class="rank-segment"></div>
+                <div class="rank-segment"></div>
+                <div class="rank-segment"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chip Stack -->
+          <div class="side-card">
+            <div class="side-card-title">CHIP STACK</div>
+            <div class="chips-display" id="chips-display">
+              <div class="chip c1000">1K</div>
+              <div class="chip c1000">1K</div>
+              <div class="chip c1000">1K</div>
+              <div class="chip c500">500</div>
+              <div class="chip c100">100</div>
+              <div class="chip c100">100</div>
+            </div>
+          </div>
+
+          <!-- On-Chain TX Log -->
+          <div class="side-card">
+            <div class="side-card-title">ON-CHAIN LOG</div>
+            <div class="tx-log" id="tx-log">
+              <div class="tx-entry create">
+                <div class="tx-action">CONTRACT DEPLOYED</div>
+                <div class="tx-detail">Table created via OPNET MCP</div>
+                <div class="tx-hash" onclick="openExplorer(this)">0x7f3a...c291</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── TX MODAL ── -->
+<div class="tx-modal" id="tx-modal">
+  <div class="tx-modal-card">
+    <div class="tx-modal-title" id="tx-modal-title">PROCESSING</div>
+    <div class="tx-modal-desc" id="tx-modal-desc">Submitting transaction to Bitcoin blockchain</div>
+    <div class="tx-loading" id="tx-loading"></div>
+    <div class="tx-steps" id="tx-steps"></div>
+    <div class="tx-hash-display" id="tx-hash-display"></div>
+  </div>
+</div>
+
+<!-- ── WINNER OVERLAY ── -->
+<div class="winner-overlay" id="winner-overlay">
+  <div class="winner-card">
+    <div class="confetti" id="confetti"></div>
+    <div style="font-size:48px;margin-bottom:12px">🏆</div>
+    <div class="winner-title">WINNER!</div>
+    <div class="winner-player" id="winner-player">bc1q...xxxx</div>
+    <div class="winner-hand" id="winner-hand">Royal Flush</div>
+    <div class="winner-amount" id="winner-amount">₿ +45,000 sats</div>
+    <div style="font-size:10px;color:var(--text-dim);margin-top:20px;letter-spacing:1px">POT DISTRIBUTED VIA SMART CONTRACT</div>
+    <button onclick="closeWinner()" style="margin-top:24px;padding:10px 32px;background:rgba(212,175,55,0.15);border:1px solid var(--gold);border-radius:8px;color:var(--gold);font-family:inherit;font-size:11px;cursor:pointer;letter-spacing:2px">
+      NEXT HAND →
+    </button>
+  </div>
+</div>
+
+<script>
+// ────────────────────────────────────────────────────────────────────────────
+// OPNET POKER — STATE MACHINE
+// ────────────────────────────────────────────────────────────────────────────
+const MCP_URL = 'https://ai.opnet.org/mcp';
+const OPNET_EXPLORER = 'https://explorer.opnet.org/tx/';
+
+let state = {
+  connected: false,
+  wallet: null,
+  address: null,
+  balance: 0,
+  currentTable: null,
+  gamePhase: 'preflop', // preflop|flop|turn|river|showdown
+  myCards: [],
+  communityCards: [],
+  pot: 0,
+  myStack: 10000,
+  myBet: 0,
+  toCall: 0,
+  isMyTurn: false,
+  players: [],
+  dealer: 0,
+  timer: null,
+  timerSec: 30,
+  tables: [],
+  txLog: [],
+  handNum: 0,
+  aiAgentActive: false
+};
+
+// ── CARD UTILS ──────────────────────────────────────────────────────────────
+const SUITS = ['♠','♥','♦','♣'];
+const SUIT_CLASSES = ['black','red','red','black'];
+const RANKS = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+const HAND_NAMES = ['High Card','One Pair','Two Pair','Three of a Kind','Straight','Flush','Full House','Four of a Kind','Straight Flush','Royal Flush'];
+
+function rng(n) { return Math.floor(Math.random() * n); }
+
+function generateDeck() {
+  let deck = [];
+  for (let s = 0; s < 4; s++)
+    for (let r = 0; r < 13; r++)
+      deck.push({ rank: RANKS[r], suit: SUITS[s], cls: SUIT_CLASSES[s], rIdx: r, sIdx: s });
+  return shuffle(deck);
+}
+
+function shuffle(arr) {
+  // Commit-reveal simulation: seed from "on-chain" hash
+  const seed = parseInt(simulateBlockHash().slice(2,10), 16);
+  let a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor((seed * (i + 1)) % (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  // Additional Fisher-Yates
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function simulateBlockHash() {
+  const hex = '0123456789abcdef';
+  let h = '0x';
+  for (let i = 0; i < 64; i++) h += hex[rng(16)];
+  return h;
+}
+
+function cardHtml(card, size = 'normal') {
+  if (!card) return `<div class="card-placeholder"></div>`;
+  const w = size === 'small' ? 'width:22px;height:32px;border-radius:3px;' : '';
+  const fs = size === 'small' ? 'font-size:8px;' : '';
+  return `<div class="card face-up ${card.cls}" style="${w}${fs}">
+    <span class="card-rank">${card.rank}</span>
+    <span class="card-suit">${card.suit}</span>
+    <span class="card-rank-bottom">${card.rank}</span>
+  </div>`;
+}
+
+// ── MCP AGENT CALLS ─────────────────────────────────────────────────────────
+async function mcpCall(method, params) {
+  updateMCPStatus('pending');
+  // In production, this makes real calls to https://ai.opnet.org/mcp
+  // Using JSON-RPC 2.0 spec
+  const payload = {
+    jsonrpc: '2.0',
+    id: Date.now(),
+    method,
+    params
+  };
+
+  try {
+    // Simulate MCP call (replace with real fetch in production)
+    /*
+    const res = await fetch(MCP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+    */
+    await sleep(600 + Math.random() * 800);
+    updateMCPStatus('active');
+    return { result: simulateMCPResponse(method, params) };
+  } catch(e) {
+    updateMCPStatus('error');
+    throw e;
+  }
+}
+
+function simulateMCPResponse(method, params) {
+  const txHash = simulateBlockHash().slice(0, 66);
+  switch(method) {
+    case 'poker.createTable':
+      return { contractAddress: 'op1q' + simAddr(30), txHash, blockHeight: 840000 + rng(1000) };
+    case 'poker.joinTable':
+      return { txHash, seat: params.seat || rng(6), blockHeight: 840000 + rng(1000) };
+    case 'poker.commitBet':
+      return { txHash, commitment: simulateBlockHash().slice(0,66), blockHeight: 840001 + rng(100) };
+    case 'poker.revealCards':
+      return { txHash, randomSeed: simulateBlockHash(), blockHeight: 840001 + rng(100) };
+    case 'poker.fold':
+    case 'poker.check':
+    case 'poker.call':
+    case 'poker.raise':
+      return { txHash, blockHeight: 840001 + rng(100) };
+    case 'poker.distributePot':
+      return { txHash, winner: params.winner, amount: params.potAmount, rakeFee: Math.floor(params.potAmount * 0.02) };
+    case 'poker.getTableState':
+      return { state: 'active', players: [], pot: state.pot };
+    default:
+      return { txHash };
+  }
+}
+
+function simAddr(n) {
+  const chars = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+  let s = '';
+  for (let i = 0; i < n; i++) s += chars[rng(chars.length)];
+  return s;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── WALLET CONNECT ───────────────────────────────────────────────────────────
+async function connectWallet(type) {
+  showTxModal('CONNECTING WALLET', `Connecting to ${type.toUpperCase()} wallet...`, [
+    { label: 'Requesting wallet access', status: 'active' },
+    { label: 'Fetching BTC address', status: 'pending' },
+    { label: 'Checking OPNET balance', status: 'pending' },
+    { label: 'Registering with MCP agent', status: 'pending' }
+  ]);
+
+  await sleep(800);
+  updateTxStep(0, 'done');
+  updateTxStep(1, 'active');
+  await sleep(600);
+
+  // Simulate wallet connection (replace with real wallet API)
+  let address;
+  if (window.opnetWallet && type === 'opnet') {
+    try { const accs = await window.opnetWallet.requestAccounts(); address = accs[0]; }
+    catch { address = null; }
+  }
+  if (window.unisat && type === 'unisat') {
+    try { const accs = await window.unisat.requestAccounts(); address = accs[0]; }
+    catch { address = null; }
+  }
+  if (!address) {
+    // Demo address for preview
+    address = 'bc1q' + simAddr(38);
+  }
+
+  updateTxStep(1, 'done');
+  updateTxStep(2, 'active');
+  await sleep(700);
+
+  const balance = 850000 + rng(500000);
+  state.address = address;
+  state.balance = balance;
+  state.wallet = type;
+  state.connected = true;
+
+  updateTxStep(2, 'done');
+  updateTxStep(3, 'active');
+
+  await mcpCall('wallet.register', { address, walletType: type });
+  updateTxStep(3, 'done');
+
+  await sleep(400);
+  closeTxModal();
+
+  document.getElementById('wallet-btn-label').textContent = address.slice(0,8) + '...' + address.slice(-4);
+  document.getElementById('display-address').textContent = address.slice(0,12) + '...' + address.slice(-6);
+  document.getElementById('display-balance').textContent = balance.toLocaleString();
+
+  showLobby();
+  notify('Wallet connected! Welcome to OPNET Poker.', 'success');
+  loadSampleTables();
+}
+
+function showConnectScreen() {
+  document.getElementById('connect-screen').style.display = 'flex';
+  document.getElementById('lobby-screen').style.display = 'none';
+  document.getElementById('game-screen').style.display = 'none';
+}
+
+function showLobby() {
+  document.getElementById('connect-screen').style.display = 'none';
+  document.getElementById('lobby-screen').style.display = 'block';
+  document.getElementById('game-screen').style.display = 'none';
+}
+
+// ── SAMPLE TABLES ────────────────────────────────────────────────────────────
+function loadSampleTables() {
+  state.tables = [
+    { id: 'tbl1', name: 'High Rollers', minBuyin: 50000, smallBlind: 250, bigBlind: 500, maxPlayers: 6, players: 3, status: 'waiting', pot: 4500, rake: 2, contractAddr: 'op1q' + simAddr(30) },
+    { id: 'tbl2', name: 'Micro Stakes', minBuyin: 5000, smallBlind: 25, bigBlind: 50, maxPlayers: 9, players: 7, status: 'playing', pot: 1250, rake: 1.5, contractAddr: 'op1q' + simAddr(30) },
+    { id: 'tbl3', name: 'Shark Tank', minBuyin: 100000, smallBlind: 500, bigBlind: 1000, maxPlayers: 6, players: 6, status: 'full', pot: 88000, rake: 2.5, contractAddr: 'op1q' + simAddr(30) },
+    { id: 'tbl4', name: 'Night Club', minBuyin: 20000, smallBlind: 100, bigBlind: 200, maxPlayers: 4, players: 1, status: 'waiting', pot: 0, rake: 2, contractAddr: 'op1q' + simAddr(30) },
+    { id: 'tbl5', name: 'Satoshi Dojo', minBuyin: 10000, smallBlind: 50, bigBlind: 100, maxPlayers: 6, players: 4, status: 'playing', pot: 5800, rake: 2, contractAddr: 'op1q' + simAddr(30) },
+  ];
+  renderTables();
+}
+
+function renderTables() {
+  const grid = document.getElementById('tables-grid');
+  grid.innerHTML = state.tables.map(t => `
+    <div class="table-card" onclick="joinTable('${t.id}')">
+      <div class="table-card-header">
+        <div class="table-name">${t.name}</div>
+        <div class="table-status status-${t.status}">${t.status.toUpperCase()}</div>
+      </div>
+      <div class="seats-bar">
+        ${Array(t.maxPlayers).fill(0).map((_,i) => `<div class="seat-dot ${i < t.players ? 'occupied' : ''}"></div>`).join('')}
+      </div>
+      <div class="table-stats">
+        <div class="stat-item"><div class="stat-value">${t.players}/${t.maxPlayers}</div><div class="stat-label">PLAYERS</div></div>
+        <div class="stat-item"><div class="stat-value">${t.bigBlind}</div><div class="stat-label">BIG BLIND</div></div>
+        <div class="stat-item"><div class="stat-value">${t.pot.toLocaleString()}</div><div class="stat-label">POT SATS</div></div>
+      </div>
+      <div class="table-meta">
+        <span>MIN BUY-IN: ₿${t.minBuyin.toLocaleString()}</span>
+        <span>RAKE: ${t.rake}%</span>
+        <span class="explorer-link" onclick="event.stopPropagation();openAddr('${t.contractAddr}')">🔗 CONTRACT</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── CREATE TABLE ─────────────────────────────────────────────────────────────
+async function createTable() {
+  const name = document.getElementById('tbl-name').value || 'New Table';
+  const maxPlayers = parseInt(document.getElementById('tbl-maxplayers').value);
+  const minBuyin = parseInt(document.getElementById('tbl-buyin').value) || 10000;
+  const smallBlind = parseInt(document.getElementById('tbl-blind').value) || 50;
+  const rake = parseFloat(document.getElementById('tbl-rake').value);
+  const timeout = parseInt(document.getElementById('tbl-timeout').value);
+
+  const btn = document.getElementById('create-btn');
+  btn.classList.add('loading');
+
+  showTxModal('DEPLOYING CONTRACT', 'Creating poker table smart contract on OPNET Bitcoin...', [
+    { label: 'Compiling smart contract', status: 'active' },
+    { label: 'Estimating gas fees', status: 'pending' },
+    { label: 'Broadcasting transaction', status: 'pending' },
+    { label: 'Contract confirmed on-chain', status: 'pending' },
+    { label: 'Initializing table state', status: 'pending' }
+  ]);
+
+  await sleep(900); updateTxStep(0,'done'); updateTxStep(1,'active');
+  await sleep(600); updateTxStep(1,'done'); updateTxStep(2,'active');
+
+  const result = await mcpCall('poker.createTable', { name, maxPlayers, minBuyin, smallBlind, bigBlind: smallBlind*2, rake, timeout, creator: state.address });
+
+  updateTxStep(2,'done'); updateTxStep(3,'active');
+  await sleep(1200);
+  updateTxStep(3,'done'); updateTxStep(4,'active');
+  await sleep(500);
+  updateTxStep(4,'done');
+
+  const txHash = result.result.txHash;
+  document.getElementById('tx-hash-display').textContent = '✅ TX: ' + txHash;
+  document.getElementById('tx-hash-display').style.display = 'block';
+
+  await sleep(1000);
+  closeTxModal();
+  btn.classList.remove('loading');
+
+  const newTable = { id: 'tbl' + Date.now(), name, minBuyin, smallBlind, bigBlind: smallBlind*2, maxPlayers, players: 0, status: 'waiting', pot: 0, rake, contractAddr: result.result.contractAddress };
+  state.tables.unshift(newTable);
+
+  notify(`Table "${name}" deployed! Contract: ${result.result.contractAddress.slice(0,16)}...`, 'gold');
+  addTxLog('CREATE', `Table "${name}" deployed`, txHash, 'create');
+
+  switchTab('tables');
+  renderTables();
+}
+
+// ── JOIN TABLE ───────────────────────────────────────────────────────────────
+async function joinTable(tableId) {
+  const table = state.tables.find(t => t.id === tableId);
+  if (!table) return;
+  if (table.status === 'full') { notify('Table is full!', 'error'); return; }
+  if (state.balance < table.minBuyin) { notify('Insufficient balance for min buy-in!', 'error'); return; }
+
+  showTxModal('JOINING TABLE', `Depositing ${table.minBuyin.toLocaleString()} sats into escrow...`, [
+    { label: 'Approving escrow contract', status: 'active' },
+    { label: 'Depositing buy-in (sats)', status: 'pending' },
+    { label: 'Assigning seat on-chain', status: 'pending' },
+    { label: 'Joining game state', status: 'pending' }
+  ]);
+
+  await sleep(800); updateTxStep(0,'done'); updateTxStep(1,'active');
+  const joinResult = await mcpCall('poker.joinTable', { tableId, address: state.address, buyin: table.minBuyin });
+  updateTxStep(1,'done'); updateTxStep(2,'active');
+  await sleep(700); updateTxStep(2,'done'); updateTxStep(3,'active');
+  await sleep(400); updateTxStep(3,'done');
+
+  document.getElementById('tx-hash-display').textContent = '✅ TX: ' + joinResult.result.txHash;
+  document.getElementById('tx-hash-display').style.display = 'block';
+  await sleep(800);
+  closeTxModal();
+
+  state.currentTable = table;
+  state.myStack = table.minBuyin;
+  state.balance -= table.minBuyin;
+
+  notify(`Joined ${table.name}! Seat ${joinResult.result.seat + 1} assigned.`, 'success');
+  addTxLog('JOIN', `Joined ${table.name} · ${table.minBuyin.toLocaleString()} sats deposited`, joinResult.result.txHash, 'join');
+
+  startGame(table);
+}
+
+// ── GAME ─────────────────────────────────────────────────────────────────────
+function startGame(table) {
+  document.getElementById('connect-screen').style.display = 'none';
+  document.getElementById('lobby-screen').style.display = 'none';
+  document.getElementById('game-screen').style.display = 'block';
+
+  document.getElementById('game-title').textContent = '♠ ' + table.name.toUpperCase();
+  document.getElementById('game-stack').textContent = state.myStack.toLocaleString();
+
+  // Init players (AI + you)
+  state.players = [
+    { name: 'bc1q...' + simAddr(4), stack: table.minBuyin + rng(20000), seat: 0, status: 'active', isYou: false, cards: [] },
+    { name: 'bc1q...' + simAddr(4), stack: table.minBuyin + rng(20000), seat: 1, status: 'active', isYou: false, cards: [] },
+    { name: state.address.slice(0,8) + '...' + state.address.slice(-4), stack: state.myStack, seat: 3, status: 'active', isYou: true, cards: [] },
+    { name: 'bc1q...' + simAddr(4), stack: table.minBuyin + rng(20000), seat: 4, status: 'active', isYou: false, cards: [] },
+    { name: 'bc1q...' + simAddr(4), stack: table.minBuyin + rng(20000), seat: 5, status: 'active', isYou: false, cards: [] },
+  ];
+
+  dealNewHand();
+}
+
+async function dealNewHand() {
+  state.handNum++;
+  state.gamePhase = 'preflop';
+  state.communityCards = [];
+  state.pot = 0;
+  state.myBet = 0;
+
+  // Reset phase indicator
+  ['preflop','flop','turn','river','showdown'].forEach(p => {
+    const el = document.getElementById('phase-' + p);
+    if (el) { el.classList.remove('active','done'); }
+  });
+  document.getElementById('phase-preflop').classList.add('active');
+  ['line-1','line-2','line-3','line-4'].forEach(l => {
+    const el = document.getElementById(l);
+    if (el) el.style.background = '';
+  });
+
+  // Reset seats
+  for (let i = 0; i < 6; i++) {
+    document.getElementById('seat-' + i).innerHTML = '';
+  }
+
+  // Reset community
+  document.getElementById('community-cards').innerHTML =
+    Array(5).fill('<div class="card-placeholder"></div>').join('');
+
+  // Shuffle on-chain
+  updateMCPStatus('pending');
+  addTxLog('DEAL', `Hand #${state.handNum} — Commit-reveal shuffle`, simulateBlockHash().slice(0,20)+'...', 'bet');
+  await sleep(300);
+  updateMCPStatus('active');
+
+  const deck = generateDeck();
+  let di = 0;
+
+  // Deal hole cards to active players
+  state.players.forEach(p => {
+    p.status = 'active';
+    p.bet = 0;
+    p.cards = [deck[di++], deck[di++]];
+  });
+  state.deck = deck.slice(di);
+  state.deckIdx = 0;
+
+  // Set blinds
+  const sbPlayer = state.players[0];
+  const bbPlayer = state.players[1];
+  const sb = state.currentTable.smallBlind;
+  const bb = state.currentTable.bigBlind;
+  sbPlayer.bet = sb; sbPlayer.stack -= sb; state.pot += sb;
+  bbPlayer.bet = bb; bbPlayer.stack -= bb; state.pot += bb;
+  state.toCall = bb;
+
+  renderSeats();
+  renderPot();
+  await sleep(200);
+
+  // Deal animation
+  for (let p = 0; p < state.players.length; p++) {
+    await sleep(120);
+    renderSeat(state.players[p]);
+  }
+
+  renderMyCards();
+  updateHandStrength();
+  setMyTurn(true);
+}
+
+function renderSeats() {
+  state.players.forEach(p => renderSeat(p));
+  document.getElementById('game-stack').textContent = state.myStack.toLocaleString();
+}
+
+function renderSeat(p) {
+  const el = document.getElementById('seat-' + p.seat);
+  if (!el) return;
+  const isDealer = state.dealer === p.seat;
+  el.innerHTML = `
+    <div style="position:relative">
+      <div class="seat-avatar ${p.isMyTurn ? 'active-turn' : ''} ${p.status==='folded'?'folded':''} ${p.isYou?'you':''}" title="${p.name}">
+        ${p.isYou ? '😎' : '🤖'}
+        ${isDealer ? '<div class="dealer-chip">D</div>' : ''}
+      </div>
+    </div>
+    <div class="seat-cards">
+      ${p.isYou ? '' : p.cards.map(c => `<div class="seat-card deal-in"></div>`).join('')}
+    </div>
+    <div class="seat-name">${p.name}</div>
+    <div class="seat-stack">₿${p.stack.toLocaleString()}</div>
+    <div class="seat-bet">${p.bet > 0 ? '● ' + p.bet.toLocaleString() : ''}</div>
+  `;
+}
+
+function renderPot() {
+  document.getElementById('pot-display').textContent = '₿ ' + state.pot.toLocaleString() + ' sats';
+}
+
+function renderMyCards() {
+  const myPlayer = state.players.find(p => p.isYou);
+  if (!myPlayer) return;
+  const container = document.getElementById('hole-cards');
+  container.innerHTML = myPlayer.cards.map(c => `
+    <div class="hole-card ${c.cls}-card deal-in">
+      <span class="rank">${c.rank}</span>
+      <span class="suit-big">${c.suit}</span>
+      <span class="rank-bottom">${c.rank}</span>
+    </div>
+  `).join('');
+}
+
+function renderCommunity() {
+  const el = document.getElementById('community-cards');
+  const cards = [...state.communityCards];
+  while (cards.length < 5) cards.push(null);
+  el.innerHTML = cards.map((c, i) => {
+    if (!c) return '<div class="card-placeholder"></div>';
+    return `<div class="card face-up ${c.cls} deal-in">
+      <span class="card-rank">${c.rank}</span>
+      <span class="card-suit">${c.suit}</span>
+      <span class="card-rank-bottom">${c.rank}</span>
+    </div>`;
+  }).join('');
+}
+
+function setMyTurn(isMyTurn) {
+  state.isMyTurn = isMyTurn;
+  const container = document.getElementById('action-buttons');
+  if (!isMyTurn) {
+    container.innerHTML = '<span style="font-size:11px;color:var(--text-dim);letter-spacing:1px">Opponent\'s turn...</span>';
+    stopTimer();
+    return;
+  }
+  const canCheck = state.toCall === 0 || state.myBet >= state.toCall;
+  container.innerHTML = `
+    <button class="action-btn btn-fold" onclick="playerAction('fold')">FOLD</button>
+    ${canCheck ? '<button class="action-btn btn-check" onclick="playerAction(\'check\')">CHECK</button>' : ''}
+    ${!canCheck ? `<button class="action-btn btn-call" onclick="playerAction('call')">CALL ₿${(state.toCall - state.myBet).toLocaleString()}</button>` : ''}
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="raise-input-group">
+        <span style="font-size:10px;color:var(--text-dim)">₿</span>
+        <input class="raise-input" type="number" id="raise-amount" placeholder="${state.toCall * 2}" value="${state.toCall * 2}" min="${state.toCall * 2}" max="${state.myStack}">
+      </div>
+      <button class="action-btn btn-raise" onclick="playerAction('raise')">RAISE</button>
+    </div>
+    <button class="action-btn btn-allin" onclick="playerAction('allin')">ALL IN ₿${state.myStack.toLocaleString()}</button>
+  `;
+  startTimer(30);
+}
+
+// ── PLAYER ACTIONS ────────────────────────────────────────────────────────────
+async function playerAction(action) {
+  if (!state.isMyTurn) return;
+  setMyTurn(false);
+  stopTimer();
+
+  let amount = 0;
+  const myPlayer = state.players.find(p => p.isYou);
+
+  if (action === 'fold') {
+    myPlayer.status = 'folded';
+    addTxLog('FOLD', 'You folded', simulateBlockHash().slice(0,20)+'...', 'fold');
+    await mcpCall('poker.fold', { address: state.address, tableId: state.currentTable.id });
+    notify('You folded.', 'info');
+    renderSeat(myPlayer);
+    setTimeout(() => runOpponentActions(), 800);
+    return;
+  }
+
+  if (action === 'check') {
+    addTxLog('CHECK', 'You checked', simulateBlockHash().slice(0,20)+'...', 'bet');
+    notify('Checked ✓', 'info');
+  }
+
+  if (action === 'call') {
+    amount = state.toCall - state.myBet;
+    myPlayer.stack -= amount; myPlayer.bet += amount;
+    state.pot += amount; state.myBet += amount; state.myStack -= amount;
+    addTxLog('CALL', `Called ₿${amount.toLocaleString()} sats`, simulateBlockHash().slice(0,20)+'...', 'bet');
+    await mcpCall('poker.commitBet', { address: state.address, amount, type: 'call' });
+    notify(`Called ₿${amount.toLocaleString()} sats — TX broadcast!`, 'gold');
+  }
+
+  if (action === 'raise') {
+    const raiseEl = document.getElementById('raise-amount');
+    amount = parseInt(raiseEl ? raiseEl.value : state.toCall * 2) || state.toCall * 2;
+    amount = Math.min(amount, state.myStack);
+    myPlayer.stack -= amount; myPlayer.bet += amount;
+    state.pot += amount; state.myBet += amount; state.myStack -= amount;
+    state.toCall = amount;
+    addTxLog('RAISE', `Raised to ₿${amount.toLocaleString()} sats`, simulateBlockHash().slice(0,20)+'...', 'bet');
+    await mcpCall('poker.commitBet', { address: state.address, amount, type: 'raise' });
+    notify(`Raised to ₿${amount.toLocaleString()} — TX broadcast!`, 'gold');
+  }
+
+  if (action === 'allin') {
+    amount = state.myStack;
+    myPlayer.stack = 0; myPlayer.bet += amount;
+    state.pot += amount; state.myBet += amount; state.myStack = 0;
+    state.toCall = amount;
+    addTxLog('ALL-IN', `ALL IN ₿${amount.toLocaleString()} sats`, simulateBlockHash().slice(0,20)+'...', 'bet');
+    await mcpCall('poker.commitBet', { address: state.address, amount, type: 'allin' });
+    notify(`🔥 ALL IN ₿${amount.toLocaleString()}!`, 'gold');
+  }
+
+  renderPot();
+  renderSeat(myPlayer);
+  document.getElementById('game-stack').textContent = state.myStack.toLocaleString();
+  updateHandStrength();
+  updateChips();
+
+  setTimeout(() => runOpponentActions(), 600);
+}
+
+// ── OPPONENT AI ───────────────────────────────────────────────────────────────
+async function runOpponentActions() {
+  const activePlayers = state.players.filter(p => !p.isYou && p.status === 'active');
+
+  for (const p of activePlayers) {
+    p.isMyTurn = true;
+    renderSeat(p);
+    await sleep(800 + rng(800));
+
+    const r = Math.random();
+    if (r < 0.15) {
+      p.status = 'folded';
+      addTxLog('FOLD', `${p.name} folded`, simulateBlockHash().slice(0,20)+'...', 'fold');
+    } else if (r < 0.55) {
+      const amount = state.toCall - (p.bet || 0);
+      if (amount > 0) {
+        p.stack -= amount; p.bet = state.toCall;
+        state.pot += amount;
+        addTxLog('CALL', `${p.name} called ₿${amount}`, simulateBlockHash().slice(0,20)+'...', 'bet');
+      } else {
+        addTxLog('CHECK', `${p.name} checked`, '', 'bet');
+      }
+    } else {
+      const raiseAmt = state.toCall * (1 + rng(3));
+      state.toCall = raiseAmt;
+      p.bet = raiseAmt; p.stack -= raiseAmt;
+      state.pot += raiseAmt;
+      addTxLog('RAISE', `${p.name} raised ₿${raiseAmt}`, simulateBlockHash().slice(0,20)+'...', 'bet');
+    }
+
+    p.isMyTurn = false;
+    renderSeat(p);
+    renderPot();
+  }
+
+  await sleep(400);
+  advancePhase();
+}
+
+// ── PHASE PROGRESSION ─────────────────────────────────────────────────────────
+async function advancePhase() {
+  const phases = ['preflop','flop','turn','river','showdown'];
+  const idx = phases.indexOf(state.gamePhase);
+  if (idx >= phases.length - 1) {
+    doShowdown();
+    return;
+  }
+
+  // Mark current done
+  const curDot = document.getElementById('phase-' + state.gamePhase);
+  if (curDot) { curDot.classList.remove('active'); curDot.classList.add('done'); }
+  const line = document.getElementById('line-' + (idx + 1));
+  if (line) line.style.background = 'rgba(39,174,96,0.3)';
+
+  state.gamePhase = phases[idx + 1];
+  const nextDot = document.getElementById('phase-' + state.gamePhase);
+  if (nextDot) nextDot.classList.add('active');
+
+  // Deal community cards
+  const deckCards = state.deck || generateDeck();
+
+  if (state.gamePhase === 'flop') {
+    state.communityCards.push(deckCards[0], deckCards[1], deckCards[2]);
+    state.deck = deckCards.slice(3);
+    const txHash = simulateBlockHash().slice(0,20) + '...';
+    addTxLog('FLOP', 'Reveal: 3 community cards', txHash, 'bet');
+    await mcpCall('poker.revealCards', { phase: 'flop', seed: simulateBlockHash() });
+  } else if (state.gamePhase === 'turn') {
+    state.communityCards.push(deckCards[0]);
+    state.deck = deckCards.slice(1);
+    addTxLog('TURN', 'Reveal: turn card', simulateBlockHash().slice(0,20)+'...', 'bet');
+  } else if (state.gamePhase === 'river') {
+    state.communityCards.push(deckCards[0]);
+    state.deck = deckCards.slice(1);
+    addTxLog('RIVER', 'Reveal: river card', simulateBlockHash().slice(0,20)+'...', 'bet');
+  }
+
+  renderCommunity();
+  updateHandStrength();
+
+  if (state.gamePhase !== 'showdown') {
+    state.myBet = 0;
+    state.toCall = 0;
+    setMyTurn(true);
+  }
+}
+
+// ── SHOWDOWN ──────────────────────────────────────────────────────────────────
+async function doShowdown() {
+  const phases = ['preflop','flop','turn','river','showdown'];
+  ['preflop','flop','turn','river'].forEach((p,i) => {
+    const dot = document.getElementById('phase-' + p);
+    if (dot) { dot.classList.remove('active'); dot.classList.add('done'); }
+    const line = document.getElementById('line-' + (i+1));
+    if (line) line.style.background = 'rgba(39,174,96,0.3)';
+  });
+  const showDot = document.getElementById('phase-showdown');
+  if (showDot) showDot.classList.add('active');
+
+  addTxLog('SHOWDOWN', 'Cards revealed — evaluating hands', simulateBlockHash().slice(0,20)+'...', 'win');
+
+  // Determine winner (simplified — random from active players for demo)
+  const activePlayers = state.players.filter(p => p.status === 'active');
+  const winnerIdx = rng(activePlayers.length);
+  const winner = activePlayers[winnerIdx];
+  const handIdx = rng(10);
+  const handName = HAND_NAMES[handIdx];
+  const rake = Math.floor(state.pot * (state.currentTable.rake / 100));
+  const winAmount = state.pot - rake;
+
+  await mcpCall('poker.distributePot', {
+    winner: winner.name,
+    potAmount: state.pot,
+    rake: state.currentTable.rake,
+    address: state.address
+  });
+
+  addTxLog('WIN', `${winner.name} wins ₿${winAmount.toLocaleString()} sats`, simulateBlockHash().slice(0,20)+'...', 'win');
+  addTxLog('RAKE', `Rake ₿${rake.toLocaleString()} sats (${state.currentTable.rake}%)`, '', 'fold');
+
+  if (winner.isYou) {
+    state.myStack += winAmount;
+    document.getElementById('game-stack').textContent = state.myStack.toLocaleString();
+    notify(`🎉 YOU WIN ₿${winAmount.toLocaleString()} sats!`, 'gold');
+  }
+
+  // Show winner overlay
+  document.getElementById('winner-player').textContent = winner.name;
+  document.getElementById('winner-hand').textContent = handName;
+  document.getElementById('winner-amount').textContent = `₿ +${winAmount.toLocaleString()} sats`;
+  spawnConfetti();
+  document.getElementById('winner-overlay').classList.add('show');
+}
+
+function closeWinner() {
+  document.getElementById('winner-overlay').classList.remove('show');
+  dealNewHand();
+}
+
+// ── HAND STRENGTH ─────────────────────────────────────────────────────────────
+function updateHandStrength() {
+  const myPlayer = state.players.find(p => p.isYou);
+  if (!myPlayer || !myPlayer.cards.length) return;
+  const allCards = [...myPlayer.cards, ...state.communityCards];
+  // Simplified: random hand for demo
+  const idx = Math.min(Math.floor(allCards.length / 2), 9);
+  const handIdx = Math.max(0, idx - 1 + rng(3));
+  const clampedIdx = Math.min(handIdx, 9);
+  document.getElementById('hand-name').textContent = HAND_NAMES[clampedIdx];
+  const segments = document.querySelectorAll('.rank-segment');
+  const lit = Math.ceil(((clampedIdx + 1) / 10) * 10);
+  segments.forEach((s, i) => {
+    s.className = 'rank-segment';
+    if (i < lit) s.classList.add(clampedIdx >= 7 ? 'super' : 'active');
+  });
+}
+
+function updateChips() {
+  const stack = state.myStack;
+  const display = document.getElementById('chips-display');
+  let remaining = stack;
+  const denoms = [[5000,'c5000','5K'],[1000,'c1000','1K'],[500,'c500','500'],[100,'c100','100'],[25,'c25','25']];
+  let chips = [];
+  denoms.forEach(([val, cls, label]) => {
+    const n = Math.floor(remaining / val);
+    remaining -= n * val;
+    for (let i = 0; i < Math.min(n, 4); i++) chips.push(`<div class="chip ${cls}">${label}</div>`);
+  });
+  display.innerHTML = chips.slice(0, 12).join('');
+}
+
+// ── TIMER ─────────────────────────────────────────────────────────────────────
+function startTimer(sec) {
+  stopTimer();
+  state.timerSec = sec;
+  const progress = document.getElementById('timer-progress');
+  const numEl = document.getElementById('timer-num');
+  const circumference = 88;
+
+  state.timer = setInterval(() => {
+    state.timerSec--;
+    numEl.textContent = state.timerSec;
+    const offset = circumference * (1 - state.timerSec / sec);
+    progress.style.strokeDashoffset = offset;
+    if (state.timerSec <= 8) progress.classList.add('urgent');
+    else progress.classList.remove('urgent');
+
+    if (state.timerSec <= 0) {
+      stopTimer();
+      playerAction('fold'); // Auto-fold on timeout
+      notify('⏱ Timeout — auto-folded!', 'error');
+    }
+  }, 1000);
+}
+
+function stopTimer() {
+  if (state.timer) { clearInterval(state.timer); state.timer = null; }
+  const progress = document.getElementById('timer-progress');
+  progress.style.strokeDashoffset = 0;
+  progress.classList.remove('urgent');
+}
+
+// ── TAB SWITCH ────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  ['tables','create','history'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = 'none';
+  });
+  document.getElementById('tab-' + name).style.display = 'block';
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', ['tables','create','history'][i] === name);
+  });
+
+  if (name === 'history') renderHistory();
+}
+
+function renderHistory() {
+  const list = document.getElementById('history-list');
+  list.innerHTML = state.txLog.map(tx => `
+    <div class="tx-entry ${tx.type}">
+      <div class="tx-action">${tx.action}</div>
+      <div class="tx-detail">${tx.detail}</div>
+      ${tx.hash ? `<div class="tx-hash" onclick="openExplorer('${tx.hash}')">${tx.hash}</div>` : ''}
+    </div>
+  `).join('') || '<div style="font-size:11px;color:var(--text-dim);padding:12px">No transactions yet</div>';
+}
+
+function backToLobby() {
+  stopTimer();
+  showLobby();
+  renderTables();
+}
+
+// ── TX LOG ────────────────────────────────────────────────────────────────────
+function addTxLog(action, detail, hash, type) {
+  const entry = { action, detail, hash, type, time: new Date().toISOString() };
+  state.txLog.unshift(entry);
+
+  const logEl = document.getElementById('tx-log');
+  if (logEl) {
+    const div = document.createElement('div');
+    div.className = `tx-entry ${type}`;
+    div.innerHTML = `
+      <div class="tx-action">${action}</div>
+      <div class="tx-detail">${detail}</div>
+      ${hash ? `<div class="tx-hash" onclick="openExplorer('${hash}')">${hash}</div>` : ''}
+    `;
+    logEl.prepend(div);
+    if (logEl.children.length > 12) logEl.removeChild(logEl.lastChild);
+  }
+}
+
+// ── TX MODAL ──────────────────────────────────────────────────────────────────
+function showTxModal(title, desc, steps) {
+  document.getElementById('tx-modal-title').textContent = title;
+  document.getElementById('tx-modal-desc').textContent = desc;
+  document.getElementById('tx-loading').style.display = 'block';
+  document.getElementById('tx-hash-display').style.display = 'none';
+
+  const stepsEl = document.getElementById('tx-steps');
+  stepsEl.innerHTML = steps.map((s, i) => `
+    <div class="tx-step ${s.status}" id="tx-step-${i}">
+      <div class="step-icon ${s.status}">${s.status==='done'?'✓':s.status==='active'?'●':'○'}</div>
+      <span>${s.label}</span>
+    </div>
+  `).join('');
+
+  document.getElementById('tx-modal').classList.add('show');
+}
+
+function updateTxStep(idx, status) {
+  const el = document.getElementById('tx-step-' + idx);
+  if (!el) return;
+  el.className = 'tx-step ' + status;
+  el.querySelector('.step-icon').className = 'step-icon ' + status;
+  el.querySelector('.step-icon').textContent = status==='done'?'✓':status==='active'?'●':'○';
+}
+
+function closeTxModal() {
+  document.getElementById('tx-loading').style.display = 'none';
+  setTimeout(() => document.getElementById('tx-modal').classList.remove('show'), 600);
+}
+
+// ── NOTIFICATIONS ─────────────────────────────────────────────────────────────
+function notify(msg, type = 'info') {
+  const stack = document.getElementById('notif-stack');
+  const el = document.createElement('div');
+  el.className = `notification notif-${type}`;
+  const icons = { success:'✅', error:'❌', info:'ℹ️', gold:'🏆' };
+  el.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  stack.appendChild(el);
+  setTimeout(() => {
+    el.style.animation = 'notif-in 0.3s reverse forwards';
+    setTimeout(() => el.remove(), 300);
+  }, 3500);
+}
+
+// ── MCP STATUS ────────────────────────────────────────────────────────────────
+function updateMCPStatus(status) {
+  const dot = document.getElementById('mcp-dot');
+  const label = document.getElementById('mcp-label');
+  if (status === 'active') {
+    dot.className = 'mcp-dot green';
+    label.textContent = 'OPNET MCP · ai.opnet.org · CONNECTED';
+  } else if (status === 'pending') {
+    dot.className = 'mcp-dot yellow';
+    label.textContent = 'OPNET MCP · Processing TX...';
+  } else if (status === 'error') {
+    dot.className = 'mcp-dot red';
+    label.textContent = 'OPNET MCP · Error';
+  }
+}
+
+// ── CONFETTI ──────────────────────────────────────────────────────────────────
+function spawnConfetti() {
+  const container = document.getElementById('confetti');
+  container.innerHTML = '';
+  const colors = ['#D4AF37','#F5E27A','#27ae60','#3498db','#c0392b','#fff'];
+  for (let i = 0; i < 40; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.style.cssText = `
+      left:${rng(100)}%;
+      background:${colors[rng(colors.length)]};
+      animation-duration:${1.5 + Math.random() * 2}s;
+      animation-delay:${Math.random() * 0.5}s;
+      width:${4 + rng(8)}px;
+      height:${4 + rng(8)}px;
+    `;
+    container.appendChild(el);
+  }
+}
+
+// ── EXPLORER ─────────────────────────────────────────────────────────────────
+function openExplorer(hashOrEl) {
+  const hash = typeof hashOrEl === 'string' ? hashOrEl : hashOrEl.textContent;
+  // In production: window.open(OPNET_EXPLORER + hash, '_blank');
+  notify('Explorer: ' + OPNET_EXPLORER + hash.slice(0,16) + '...', 'info');
+}
+
+function openAddr(addr) {
+  notify('Contract: ' + addr, 'info');
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+updateMCPStatus('active');
+</script>
+</body>
+</html>
